@@ -8,6 +8,12 @@ import re
 import pandas as pd
 from urllib.parse import urlparse
 import os
+from datetime import date
+
+
+
+
+today = date.today().isoformat()
 
 
 
@@ -131,195 +137,211 @@ def current_theatre():
                 
 
 
-def details():
+def details(theatre_file):
+    #theatre_file = get_unique_file_path("theatres", "theatres_details", extension=".csv")
 
+    if not theatre_file:
+        print("No unmatched file found.")
+        return
 
-    for file_name in os.listdir("theatres"):
-        results_current = []
-        
-        
-        if file_name.endswith(".csv"):
-            file_path = os.path.join("theatres", file_name)
-            df = pd.read_csv(file_path)
-            
+    file_name = os.path.basename(theatre_file)  # get just the file name
+    results_current = []
+    visited_links = set()
 
-        for x in df["web_Link"]:
+    df = pd.read_csv(theatre_file)
 
-    
+    driver = webdriver.Chrome()
 
-            # Initialize driver once
-            driver = webdriver.Chrome()
-                
-            
+    for x in df["web_Link"]:
+        if x in visited_links:
+            print(f"Already visited: {x}, skipping.")
+            continue
 
-                    
-            for attempt in range(3):  # Maximum of 3 attempts
-                    
-                try:
-                        # === Open the target webpage ===
-                        
-                    driver.get(x)
-                    sleep(5)  # Allow time for JavaScript to load the content
-                    break  # Break out of loop if successful
-                except Exception as e:
-                    print(f"[Attempt {attempt+1}] Error loading {x}: {e}")
-                    if attempt == 1:  # On second failure
-                        print(f"Skipping {x} after two failed attempts.")
-                        continue  # Move to the next show
+        visited_links.add(x)
 
-                
-                    
-                    # === Parse the individual show page ===
+        for attempt in range(3):
+            try:
+                driver.get(x)
+                sleep(5)
+                break
+            except Exception as e:
+                print(f"[Attempt {attempt+1}] Error loading {x}: {e}")
+                if attempt == 1:
+                    print(f"Skipping {x} after two failed attempts.")
+                    continue
+
+        try:
             show_soup = BeautifulSoup(driver.page_source, "html.parser")
             base_bar1 = show_soup.find("body", class_="winOS")
-                        #print(show_soup.prettify())  # (Optional) print full HTML structure
 
-                        
-                
-                            # === Drill down to show detail section ===
             base_bar = base_bar1.find("div", class_=re.compile("^production-page"))\
-                    .find("div", class_=re.compile("^xt-c-box"))\
-                    .find("div", class_="row xt-fixed-sidebar-row")
-                    
-                        
-                            
-                    
+                .find("div", class_=re.compile("^xt-c-box"))\
+                .find("div", class_="row xt-fixed-sidebar-row")
 
-
-
-                                  
-                    
-                            # === Navigate to production details container ===
             creative_team = base_bar.find("div", class_=re.compile("col l8 m12 def-text s12 xt-l-col-right"))\
-                    .find("div", id=re.compile("People"))\
-                    .find("div", class_=re.compile("row"))\
-                    .find_all("div", class_= re.compile("col s12"))
-                    
-                    
-                    # === Extract production staff info ===
+                .find("div", id=re.compile("People"))\
+                .find("div", class_=re.compile("row"))\
+                .find_all("div", class_=re.compile("col s12"))
+
             production_details = creative_team[2].find("div", class_="row active")
+            production_div = production_details.find_all("div", class_="col s12")
 
-
-                    # === Extract director info ===
-            production_div = production_details.find_all("div", class_= "col s12")
-            #print(len(production_div))
+            # === Director ===
             director_name = None
-
             for div in production_div:
                 if "Directed by" in div.get_text(strip=True):
-                    director_text = div.get_text(strip=True)
-                    match = re.search(r"Directed\s*by\s*([^;]+)", director_text)
+                    match = re.search(r"Directed\s*by\s*([^;]+)", div.get_text(strip=True))
                     director_name = match.group(1).strip() if match else None
-                    break  # stop at the first match
-
-                    
-                    
-
+                    break
             print(director_name)
 
-                    # === Extract Composer info ===
-            production_div = production_details.find_all("div", class_= "col s12")
-
+            # === Composer / Lyricist ===
             composer_name = None
-
             for div in production_div:
-                if "Lyrics by" in div.get_text(strip=True):
-                    lyrics_text = div.get_text(strip=True)
-                    match = re.search(r"Lyrics\s*by\s*([^;]+)", lyrics_text)
-                    composer_name = match.group(1).strip() if match else None
-                    break  # stop at the first match
-                elif "Music by" in div.get_text(strip=True):
-                    lyrics_text = div.get_text(strip=True)
-                    match = re.search(r"Music\s*by\s*([^;]+)", lyrics_text)
-                    composer_name = match.group(1).strip() if match else None
-                    break  # stop at the first match
-                elif "Music orchestrated by" in div.get_text(strip=True):
-                    lyrics_text = div.get_text(strip=True)
-                    match = re.search(r"Music\s*orchestrated\s*by\s*([^;]+)", lyrics_text)
-                    composer_name = match.group(1).strip() if match else None
-                    break  # stop at the first match
+                text = div.get_text(strip=True)
+                for label in ["Lyrics by", "Music by", "Music orchestrated by"]:
+                    if label in text:
+                        match = re.search(fr"{label}\s*([^;]+)", text)
+                        composer_name = match.group(1).strip() if match else None
+                        break
+                if composer_name:
+                    break
             print(composer_name)
 
-                    # === Extract Playwright info ===
-            production_div = production_details.find_all("div", class_= "col s12")
-
+            # === Playwright ===
             playwright_name = None
-
             for div in production_div:
-                playwright_text = div.get_text(strip=True)
-
-                if "Book by" in playwright_text:
-                    match = re.search(r"Book\s*by\s*([^;]+)", playwright_text, re.IGNORECASE)
-                    playwright_name = match.group(1).strip() if match else None
-                    break  # stop at the first match
-                elif "Written by" in playwright_text:
-                    match = re.search(r"Written\s*by\s*([^;]+)", playwright_text, re.IGNORECASE)
-                    playwright_name = match.group(1).strip() if match else None
-                    break  # stop at the first match
-
-
+                text = div.get_text(strip=True)
+                if "Book by" in text:
+                    match = re.search(r"Book\s*by\s*([^;]+)", text)
+                elif "Written by" in text:
+                    match = re.search(r"Written\s*by\s*([^;]+)", text)
+                else:
+                    continue
+                playwright_name = match.group(1).strip() if match else None
+                break
             print(playwright_name)
 
-
-                    # === Extract Rights info ===
-            production_div = production_details.find_all("div", class_= "col s12")
-
+            # === Producer ===
             producer_name = None
-
-            
             for div in production_div:
                 if "Produced by" in div.get_text(strip=True):
-                    lyrics_text = div.get_text(strip=True)
-                    match = re.search(r"Produced\s*by\s*([^;]+)", lyrics_text)
+                    match = re.search(r"Produced\s*by\s*([^;]+)", div.get_text(strip=True))
                     producer_name = match.group(1).strip() if match else None
-                    break  # stop at the first match
+                    break
             print(producer_name)
 
-            
-          
+            # === Performance Info ===
+            performance_info = base_bar.find("div", class_=re.compile("col l4 m10 push-m1 s12 s12 xt-l-col-left"))\
+                .find("div", class_=re.compile("production-info-panel"))\
+                .find("div", class_=re.compile("xt-fixed-sidebar"))\
+                .find("div", class_=re.compile("xt-fixed-block"), attrs={"data-id": "part-b"})\
+                .find("div", class_="xt-info-block")\
+                .find_all("div", class_="row wrapper")
 
-            
-
-
-
-
-
-
-
-
-
-
-
-                    # === scraped result info ===
-            results_current.append({
-                "Director" : director_name,
-                "Composer/Lyricist": composer_name,
-                "Playwright" : playwright_name,
-                "Rights Holder": producer_name,
+            # === Opening Date ===
+            try:
+                opening_instance = performance_info[0].find(class_='col s5 m3 l5 txt-paddings')\
+                    .find("div", class_="xt-main-title").text.strip()
                 
-                        
+            except:
+                opening_instance = "N/A"
+            print(opening_instance)
 
-                })
+            # === Closing Date ===
+            try:
+                closing_instance = performance_info[0].find(class_='col s7 m6 l7 txt-paddings vertical-divider')\
+                    .find("div", class_="xt-main-title").text.strip()
+                if not closing_instance:
+                    closing_instance = "Present"
+            except:
+                closing_instance = "Present"
+            print(closing_instance)
 
-            
-            #file.to_csv(f"rights_details/{theatre}_details.csv", index=False)
-            
-        df2 = pd.DataFrame(results_current)
-        df= pd.concat([df, df2], axis=1)
-        df.to_csv(f"theatres/{file_name}.csv", index=False)
-        #print(f'End of {theatre} productions.')
-        driver.quit()
+            # === Preview Date ===
+            try:
+                preview_instance = base_bar.find("div", class_=re.compile("col l4 m10 push-m1 s12 s12 xt-l-col-left"))\
+                .find("div", class_=re.compile("production-info-panel"))\
+                .find("div", class_=re.compile("xt-fixed-sidebar"))\
+                .find("div", class_=re.compile("xt-fixed-block"), attrs={"data-id": "part-b"})\
+                .find("div", class_="xt-info-block")\
+                .find("div", class_="row wrapper hide-on-med-only")\
+                .find("div", class_='col s12 txt-paddings')\
+                .find("div", class_="xt-main-title").text.strip()
+                if not preview_instance:
+                    preview_instance = opening_instance
+            except:
+                preview_instance = opening_instance
+            print(preview_instance)
+
+            # === Save scraped info ===
+            results_current.append({
+                "Director": director_name,
+                "Composer/Lyricist": composer_name,
+                "Playwright": playwright_name,
+                "Rights Holder": producer_name,
+                "Preview Date": preview_instance,
+                "Opening Date": opening_instance,
+                "Closing Date": closing_instance,
+                "Scraped Date": today
+            })
+
+        except Exception as e:
+            print(f"Failed to parse {x}: {e}")
+
+    driver.quit()
+
+    # Save result to CSV
+    df2 = pd.DataFrame(results_current)
+    df = pd.concat([df, df2], axis=1)
+    df.to_csv(f"theatres_details/{file_name}", index=False)
 
 
-def join_dataframes_on_column(df1, df2, join_column, how='inner', suffixes=('_left', '_right')):
-    if join_column not in df1.columns or join_column not in df2.columns:
-        raise ValueError(f"Column '{join_column}' must exist in both DataFrames.")
+
+def get_unique_file_path(folder1, folder2, extension=None):
+
+    """
+    Returns the full path of the first file in folder1 that does not exist in folder2.
     
-    joined_df = pd.merge(df1, df2, on=join_column, how=how, suffixes=suffixes)
-    return joined_df
+    Parameters:
+        folder1 (str): Path to the source folder.
+        folder2 (str): Path to the comparison folder.
+        extension (str, optional): If provided, filters by file extension (e.g., ".csv").
+
+    Returns:
+        str or None: Full path of the first unmatched file, or None if all exist in folder2.
+    """
+    # List files with optional extension filter
+    files1 = [f for f in os.listdir(folder1) if not extension or f.endswith(extension)]
+    files2 = set(os.listdir(folder2))
+
+    # Find first file in folder1 not in folder2
+    for file in files1:
+        if file not in files2:
+            return os.path.join(folder1, file)
+
+    return None  # If all files exist in folder2
 
 
 
+
+
+"""
+    Loops through all files in folder_one and processes only those 
+    not already present in folder_two.
+"""
+
+
+
+def process_all_unmatched_files(folder_one, folder_two):
+    
+    for file in os.listdir(folder_one):
+        if file.endswith(".csv") and file not in os.listdir(folder_two):
+            theatre_file_path = os.path.join(folder_one, file)
+            print(f"Processing: {theatre_file_path}")
+            details(theatre_file_path)
+        else:
+            print(f"Skipping: {file} (already processed or not a CSV)")
             
 
 
@@ -335,4 +357,5 @@ def join_dataframes_on_column(df1, df2, join_column, how='inner', suffixes=('_le
 if __name__ == "__main__":
     #scrape_ibdb_shows()
     #current_theatre()
-    details()
+    #details()
+    process_all_unmatched_files("theatres", "theatres_details")
