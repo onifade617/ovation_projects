@@ -152,9 +152,22 @@ def details(theatre_file):
 
     driver = webdriver.Chrome()
 
-    for x in df["web_Link"]:
-        if x in visited_links:
-            print(f"Already visited: {x}, skipping.")
+    for idx, row in df.iterrows():
+        x = row["web_Link"]
+        data_row = {
+            "Director": None,
+            "Composer/Lyricist": None,
+            "Playwright": None,
+            "Rights Holder": None,
+            "Preview Date": None,
+            "Opening Date": None,
+            "Closing Date": None,
+            "Scraped Date": today
+        }
+
+        if pd.isna(x) or x in visited_links:
+            print(f"Skipping: {x}")
+            results_current.append(data_row)
             continue
 
         visited_links.add(x)
@@ -166,8 +179,9 @@ def details(theatre_file):
                 break
             except Exception as e:
                 print(f"[Attempt {attempt+1}] Error loading {x}: {e}")
-                if attempt == 1:
-                    print(f"Skipping {x} after two failed attempts.")
+                if attempt == 2:
+                    print(f"Skipping {x} after three failed attempts.")
+                    results_current.append(data_row)
                     continue
 
         try:
@@ -186,30 +200,27 @@ def details(theatre_file):
             production_details = creative_team[2].find("div", class_="row active")
             production_div = production_details.find_all("div", class_="col s12")
 
-            # === Director ===
-            director_name = None
+            # Director
             for div in production_div:
                 if "Directed by" in div.get_text(strip=True):
                     match = re.search(r"Directed\s*by\s*([^;]+)", div.get_text(strip=True))
-                    director_name = match.group(1).strip() if match else None
+                    if match:
+                        data_row["Director"] = match.group(1).strip()
                     break
-            print(director_name)
 
-            # === Composer / Lyricist ===
-            composer_name = None
+            # Composer/Lyricist
             for div in production_div:
                 text = div.get_text(strip=True)
                 for label in ["Lyrics by", "Music by", "Music orchestrated by"]:
                     if label in text:
                         match = re.search(fr"{label}\s*([^;]+)", text)
-                        composer_name = match.group(1).strip() if match else None
-                        break
-                if composer_name:
+                        if match:
+                            data_row["Composer/Lyricist"] = match.group(1).strip()
+                            break
+                if data_row["Composer/Lyricist"]:
                     break
-            print(composer_name)
 
-            # === Playwright ===
-            playwright_name = None
+            # Playwright
             for div in production_div:
                 text = div.get_text(strip=True)
                 if "Book by" in text:
@@ -218,20 +229,19 @@ def details(theatre_file):
                     match = re.search(r"Written\s*by\s*([^;]+)", text)
                 else:
                     continue
-                playwright_name = match.group(1).strip() if match else None
-                break
-            print(playwright_name)
+                if match:
+                    data_row["Playwright"] = match.group(1).strip()
+                    break
 
-            # === Producer ===
-            producer_name = None
+            # Rights Holder / Producer
             for div in production_div:
                 if "Produced by" in div.get_text(strip=True):
                     match = re.search(r"Produced\s*by\s*([^;]+)", div.get_text(strip=True))
-                    producer_name = match.group(1).strip() if match else None
+                    if match:
+                        data_row["Rights Holder"] = match.group(1).strip()
                     break
-            print(producer_name)
 
-            # === Performance Info ===
+            # Performance Info
             performance_info = base_bar.find("div", class_=re.compile("col l4 m10 push-m1 s12 s12 xt-l-col-left"))\
                 .find("div", class_=re.compile("production-info-panel"))\
                 .find("div", class_=re.compile("xt-fixed-sidebar"))\
@@ -239,62 +249,46 @@ def details(theatre_file):
                 .find("div", class_="xt-info-block")\
                 .find_all("div", class_="row wrapper")
 
-            # === Opening Date ===
+            # Opening Date
             try:
-                opening_instance = performance_info[0].find(class_='col s5 m3 l5 txt-paddings')\
+                data_row["Opening Date"] = performance_info[0].find(class_='col s5 m3 l5 txt-paddings')\
                     .find("div", class_="xt-main-title").text.strip()
-                
             except:
-                opening_instance = "N/A"
-            print(opening_instance)
+                data_row["Opening Date"] = "N/A"
 
-            # === Closing Date ===
+            # Closing Date
             try:
-                closing_instance = performance_info[0].find(class_='col s7 m6 l7 txt-paddings vertical-divider')\
-                    .find("div", class_="xt-main-title").text.strip()
-                if not closing_instance:
-                    closing_instance = "Present"
+                data_row["Closing Date"] = performance_info[0].find(class_='col s7 m6 l7 txt-paddings vertical-divider')\
+                    .find("div", class_="xt-main-title").text.strip() or "Present"
             except:
-                closing_instance = "Present"
-            print(closing_instance)
+                data_row["Closing Date"] = "Present"
 
-            # === Preview Date ===
+            # Preview Date
             try:
-                preview_instance = base_bar.find("div", class_=re.compile("col l4 m10 push-m1 s12 s12 xt-l-col-left"))\
-                .find("div", class_=re.compile("production-info-panel"))\
-                .find("div", class_=re.compile("xt-fixed-sidebar"))\
-                .find("div", class_=re.compile("xt-fixed-block"), attrs={"data-id": "part-b"})\
-                .find("div", class_="xt-info-block")\
-                .find("div", class_="row wrapper hide-on-med-only")\
-                .find("div", class_='col s12 txt-paddings')\
-                .find("div", class_="xt-main-title").text.strip()
-                if not preview_instance:
-                    preview_instance = opening_instance
+                data_row["Preview Date"] = base_bar.find("div", class_=re.compile("col l4 m10 push-m1 s12 s12 xt-l-col-left"))\
+                    .find("div", class_=re.compile("production-info-panel"))\
+                    .find("div", class_=re.compile("xt-fixed-sidebar"))\
+                    .find("div", class_=re.compile("xt-fixed-block"), attrs={"data-id": "part-b"})\
+                    .find("div", class_="xt-info-block")\
+                    .find("div", class_="row wrapper hide-on-med-only")\
+                    .find("div", class_='col s12 txt-paddings')\
+                    .find("div", class_="xt-main-title").text.strip() or data_row["Opening Date"]
             except:
-                preview_instance = opening_instance
-            print(preview_instance)
-
-            # === Save scraped info ===
-            results_current.append({
-                "Director": director_name,
-                "Composer/Lyricist": composer_name,
-                "Playwright": playwright_name,
-                "Rights Holder": producer_name,
-                "Preview Date": preview_instance,
-                "Opening Date": opening_instance,
-                "Closing Date": closing_instance,
-                "Scraped Date": today
-            })
+                data_row["Preview Date"] = data_row["Opening Date"]
 
         except Exception as e:
             print(f"Failed to parse {x}: {e}")
 
+        results_current.append(data_row)
+
     driver.quit()
 
-    # Save result to CSV
-    df2 = pd.DataFrame(results_current)
-    df = pd.concat([df, df2], axis=1)
-    df.to_csv(f"theatres_details/{file_name}", index=False)
+    # Append results to original dataframe
+    results_df = pd.DataFrame(results_current)
+    final_df = pd.concat([df.reset_index(drop=True), results_df], axis=1)
+
+    # Save the result
+    final_df.to_csv(f"theatres_details/{file_name}", index=False)
 
 
 
