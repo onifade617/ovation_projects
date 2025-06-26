@@ -9,6 +9,7 @@ import pandas as pd
 from urllib.parse import urlparse
 import os
 from datetime import date
+import traceback
 
 
 
@@ -82,7 +83,7 @@ def current_theatre():
   
 
     for i in list_of_theatres_urls:
-        
+        list_of_productions_urls = []
         # Initialize driver once
         driver = webdriver.Chrome()
             
@@ -196,8 +197,12 @@ def details(theatre_file):
                 .find("div", id=re.compile("People"))\
                 .find("div", class_=re.compile("row"))\
                 .find_all("div", class_=re.compile("col s12"))
+            
+            team_length = len(creative_team)
+            print(f"creative_team length for {x}: {team_length}")
+            print(creative_team[2].prettify())
 
-            production_details = creative_team[2].find("div", class_="row active")
+            production_details = creative_team[-1].find("div", class_="row active", id = "ProductionStaff")
             production_div = production_details.find_all("div", class_="col s12")
 
             # Director
@@ -277,7 +282,8 @@ def details(theatre_file):
                 data_row["Preview Date"] = data_row["Opening Date"]
 
         except Exception as e:
-            print(f"Failed to parse {x}: {e}")
+            print(f"Failed to parse {x}. Error: {e}")
+            traceback.print_exc()
 
         results_current.append(data_row)
 
