@@ -88,5 +88,99 @@ def love_theatre():
 
 
 
+def date_cast():
+
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/123.0.0.0 Safari/537.36")
+    
+    # Initialize driver once
+    driver = webdriver.Chrome(options=options)
+
+    df = pd.read_csv(r"love_theatre_shows.csv")
+
+    performance_dates = []
+    cast_creatives = []
+
+    for url in df["Link"]:
+
+        
+        
+        
+        try:
+            
+            driver.get(url)
+            sleep(5)
+
+            soup = BeautifulSoup(driver.page_source, "html.parser")
+
+            info1 = soup.find("main")\
+                .find("section", class_="mb-2 mb-xl-3 no-border")\
+                .find("section", class_="py-2")\
+                .find("div", class_="container")\
+                .find("div", class_="row")\
+                .find("div", class_="col-lg-8")\
+                .find("div")\
+                .find_all("h3")
+            
+            print(info1[0].prettify())
+                
+            
+            cast_info = "N/A"
+            perf_date = "N/A"
+                
+                
+            
+            # Loop through all <p> tags
+            for h3 in info1:
+                if "ticket information" in h3.get_text(strip=True).lower():
+                    next_element = h3.find_next_sibling()
+                    if next_element:
+                        perform_date = next_element.get_text(strip=True)
+                        # Remove everything before the first number
+                        cleaned_text = re.sub(r"^[^\d]*", "", perform_date)
+                        print("Next sibling content:", perform_date)
+                        perf_date = cleaned_text
+                        
+                   
+
+
+                if "cast" in h3.get_text(strip=True).lower():
+                    next_element = h3.find_next_sibling()
+                    if next_element:
+                        cast_info = next_element.get_text(strip=True)
+                        print("Next sibling content:", cast_info)
+                        
+                        
+            performance_dates.append(perf_date)
+            cast_creatives.append(cast_info)      
+            
+        except Exception as e:
+            print(f"Error processing {url}: {e}")
+            performance_dates.append("Error")
+            cast_creatives.append("Error")
+        
+    df["Performance Date"] = performance_dates
+    df["Cast & Creatives"] = cast_creatives
+     
+    driver.quit()  # Ensure browser closes even if there's an error
+
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
-    love_theatre()
+    #love_theatre()
+    date_cast()
