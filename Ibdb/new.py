@@ -23,3 +23,30 @@ combined_df = pd.concat(dataframes, ignore_index=True)
 combined_df.to_csv('combined_data.csv', index=False)
 
 print("All CSV files have been successfully combined.")
+
+
+
+"""
+
+def add_theatre_column_to_folder(folder_path):
+    for file in os.listdir(folder_path):
+        if file.endswith(".csv") and "_details" in file:
+            file_path = os.path.join(folder_path, file)
+
+            # Remove '_details.csv' from the filename to get the theatre name
+            theatre_name = file.replace("_details.csv", "").strip()
+
+            try:
+                df = pd.read_csv(file_path)
+                df["theatre"] = theatre_name.title()  # Title-case formatting
+
+                # Save changes (overwrite original)
+                df.to_csv(file_path, index=False)
+                print(f"✅ 'theatre' column added to '{file}' with value: '{theatre_name.title()}'")
+            
+            except Exception as e:
+                print(f"❌ Error processing {file}: {e}")
+
+# Example usage
+add_theatre_column_to_folder("theatres_details")
+"""

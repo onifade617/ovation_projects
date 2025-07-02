@@ -202,7 +202,7 @@ def details(theatre_file):
             print(f"creative_team length for {x}: {team_length}")
             print(creative_team[2].prettify())
 
-            production_details = creative_team[-1].find("div", class_="row active", id = "ProductionStaff")
+            production_details = creative_team[2].find("div", class_="row active", id = "ProductionStaff")
             production_div = production_details.find_all("div", class_="col s12")
 
             # Director

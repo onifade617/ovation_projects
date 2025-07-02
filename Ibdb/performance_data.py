@@ -169,7 +169,7 @@ def current_parse():
 
              # === Extract Preview Info (e.g., Broadway, Off-Broadway) ===
             try:
-                preview_instance = perform[1].find(class_='col s5 m6 l5 txt-paddings')\
+                preview_instance = perform[1].find(class_='col s12 txt-paddings')\
                     .find("div", class_="xt-main-title").text
             except:
                 preview_instance =  None  
