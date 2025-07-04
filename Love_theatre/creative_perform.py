@@ -168,6 +168,7 @@ def date_cast():
     df["Performance Date"] = performance_dates
     df["Cast & Creatives"] = cast_creatives
      
+    df.to_csv("love_theatre_shows.csv", index=False)
     driver.quit()  # Ensure browser closes even if there's an error
 
 
